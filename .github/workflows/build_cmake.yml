@@ -17,24 +17,26 @@ jobs:
       matrix:
         config:
           - {
-            name: "Windows Latest MSVC", artifact: "Windows-MSVC.7z",
+            name: "gadgify_win_msvc_x86-64", artifact: "gadgify_win_msvc_x86-64.7z",
             os: windows-latest,
             cc: "cl", cxx: "cl",
             environment_script: "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat"
           }
           - {
-            name: "Windows Latest MinGW", artifact: "Windows-MinGW.7z",
+            name: "gadgify_win_mingw_x86-64", artifact: "gadgify_win_mingw_x86-64.7z",
             os: windows-latest,
             cc: "gcc", cxx: "g++"
           }
           - {
-            name: "Ubuntu Latest GCC", artifact: "Linux.7z",
+            name: "gadgify_linux_gcc_x86-64", artifact: "gadgify_linux_gcc_x86-64.7z",
             os: ubuntu-latest,
             cc: "gcc", cxx: "g++"
           }
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: true
 
       - name: Download Ninja and CMake
         shell: cmake -P {0}
