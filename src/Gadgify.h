@@ -12,7 +12,7 @@
 
 struct Bytecode
 {
-    uint32_t virtualAddress;
+    DWORD virtualAddress;
     std::vector<char> bytes;
 };
 

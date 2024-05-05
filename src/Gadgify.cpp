@@ -9,7 +9,7 @@ Gadgify::Gadgify(std::string peFile) {
         {
             bytecodes_.push_back(
                     {
-                        .virtualAddress = reinterpret_cast<uint32_t>(sectionHeader.VirtualAddress),
+                        .virtualAddress = sectionHeader.VirtualAddress,
                         .bytes = sectionContents
                     }
             );

@@ -1,5 +1,4 @@
 #include "PEFile.h"
-#include <utility>
 
 PEFile::PEFile(std::string filePath)
 {
