@@ -61,7 +61,7 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
         uint32_t gapCounter = 0;
         uint32_t matches = 0;
 
-        ZyanU64 runtime_address = 0x007FFFFFFF400000;
+        ZyanU64 runtime_address = 0;
         ZyanUSize offset = 0;
         ZydisDisassembledInstruction instruction;
         while (ZYAN_SUCCESS(ZydisDisassembleIntel(

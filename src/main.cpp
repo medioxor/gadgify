@@ -1,16 +1,17 @@
 #include <iostream>
 #include <argparse.hpp>
+#include <iomanip>
 #include "Gadgify.h"
 
 int main(int argc, char *argv[]) {
     argparse::ArgumentParser program("Gadgify");
-
+    uint32_t gap = 0;
     program.add_argument("-g", "--gap")
             .help("The gap between instructions specified in the pattern e.g. searching for the pattern"
                   "'mov r*, r1*;call r*;sub *' with a gap of '3' will result in gadgets that can have up to 3"
                   "instructions that do not match the pattern between each instruction in the pattern provided.")
             .scan<'u', uint32_t>()
-            .default_value(0);
+            .default_value(gap);
 
     program.add_argument("-p", "--pattern")
             .required()
@@ -31,7 +32,7 @@ int main(int argc, char *argv[]) {
 
     std::stringstream results;
     Gadgify::GetGadgets([&results](uint64_t offset, const std::string &gadget) {
-        results << "0x" << std::hex << offset << ":" << gadget << std::endl;
+        results << "0x" << std::hex << std::setfill('0') << std::setw(8) << offset << ": " << gadget << std::endl;
     }, program.get<std::string>(
             "binaryPath"),
             program.get<std::string>("--pattern"),
