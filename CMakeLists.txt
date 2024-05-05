@@ -24,6 +24,8 @@ add_executable(gadgify
         src/Gadgify.h
 )
 
+install(TARGETS gadgify)
+
 target_link_options(gadgify PRIVATE --static)
 
 target_link_libraries(gadgify PRIVATE "Zydis")
