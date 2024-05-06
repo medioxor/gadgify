@@ -239,6 +239,12 @@ jobs:
       - name: Install Strip
         run: cmake --install build --prefix instdir --strip
 
+
+      - name: Rename binary
+        working-directory: instdir
+        run: cmake -E rename ./instdir/bin/${{ matrix.config.binary }} ./instdir/bin/${{ matrix.config.artifact }}
+
+
       - name: Upload
         uses: actions/upload-artifact@v3
         with:
@@ -317,6 +323,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.set_upload_url.outputs.upload_url }}
-          asset_path: ./${{ matrix.config.artifact }}
+          asset_path: ./
           asset_name: ${{ matrix.config.artifact }}
           asset_content_type: application/octet-stream
