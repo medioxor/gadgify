@@ -247,7 +247,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v3
         with:
-          path: ./instdir/bin/${{ matrix.config.binary }}
+          path: ./instdir/bin/${{ matrix.config.artifact }}
           name: ${{ matrix.config.artifact }}
 
   release:
