@@ -241,7 +241,6 @@ jobs:
 
 
       - name: Rename binary
-        working-directory: instdir
         run: cmake -E rename ./instdir/bin/${{ matrix.config.binary }} ./instdir/bin/${{ matrix.config.artifact }}
 
 
