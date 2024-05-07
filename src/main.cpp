@@ -17,9 +17,14 @@ int main(int argc, char *argv[]) {
             .required()
             .help("The pattern to search for.");
 
+    program.add_argument("-r", "--raw")
+            .help("Treat the binary as raw executable code and not as a PE.")
+            .default_value(false)
+            .implicit_value(true);
+
     program.add_argument("binaryPath")
             .required()
-            .help("Path of the binary to search for gadgets. e.g. C:\\Windows\\System32\\ntdll.dll");
+            .help("Path of the file to search for gadgets. e.g. C:\\Windows\\System32\\ntdll.dll");
 
     try {
         program.parse_args(argc, argv);
@@ -30,14 +35,32 @@ int main(int argc, char *argv[]) {
         std::exit(1);
     }
 
+    bool isRaw = program.get<bool>("--raw");
     std::stringstream results;
-    Gadgify::GetGadgets([&results](uint64_t offset, const std::string &gadget) {
-        results << "0x" << std::hex << std::setfill('0') << std::setw(8) << offset << ": " << gadget << std::endl;
-    }, program.get<std::string>(
-            "binaryPath"),
+
+    if (isRaw)
+    {
+        FileContents file = File::Read(program.get<std::string>("binaryPath"));
+        Gadgify::GetGadgets([&results](uint64_t offset, const std::string &gadget)
+            {
+                results << "0x" << std::hex << std::setfill('0') << std::setw(8) << offset << ": " << gadget << std::endl;
+            },
+            std::vector<char>(file.contents, file.contents+file.size),
             program.get<std::string>("--pattern"),
             program.get<uint32_t>("--gap")
-    );
+        );
+    }
+    else
+    {
+        Gadgify::GetGadgets([&results](uint64_t offset, const std::string &gadget)
+            {
+                results << "0x" << std::hex << std::setfill('0') << std::setw(8) << offset << ": " << gadget << std::endl;
+            },
+            program.get<std::string>("binaryPath"),
+            program.get<std::string>("--pattern"),
+            program.get<uint32_t>("--gap")
+        );
+    }
 
     std::cout << results.str() << std::endl;
 
