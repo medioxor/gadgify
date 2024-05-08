@@ -1,7 +1,5 @@
 #include "Gadgify.h"
 
-#include <utility>
-
 Gadgify::Gadgify(std::string peFile) {
     PEFile::GetSections([&](IMAGE_SECTION_HEADER sectionHeader, const std::vector<char>& sectionContents)
     {
@@ -60,7 +58,6 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
         std::vector<std::string> gadget;
         uint32_t gapCounter = 0;
         uint32_t matches = 0;
-
         ZyanU64 runtime_address = 0;
         ZyanUSize offset = 0;
         ZydisDisassembledInstruction instruction;
@@ -109,7 +106,7 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
                     instruction.info.mnemonic == ZYDIS_MNEMONIC_JRCXZ ||
                     instruction.info.mnemonic == ZYDIS_MNEMONIC_JS ||
                     instruction.info.mnemonic == ZYDIS_MNEMONIC_JZ
-                        )
+                )
                 {
                     gapCounter = 0;
                     matches = 0;
@@ -184,6 +181,13 @@ std::vector<std::regex> Gadgify::ConstructRegexes(const std::string& pattern) {
         }
 
         currentRegex.push_back(i);
+    }
+
+    if (regexes.empty() || !currentRegex.empty())
+    {
+        std::cout << "Failed to construct query. Ensure each instruction always ends with a semi-colon e.g. "
+                     "\"-p 'mov r1*; sub *; ret;'\" NOT \"-p 'ret' etc" << std::endl;
+        regexes.clear();
     }
     return regexes;
 }

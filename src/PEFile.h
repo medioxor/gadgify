@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <cstring>
+#include <iostream>
 #include "File.h"
 #include "WindowsTypes.h"
 

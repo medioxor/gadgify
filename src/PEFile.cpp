@@ -109,6 +109,7 @@ bool PEFile::GetSections(const std::function<void(IMAGE_SECTION_HEADER sectionHe
 
     if (!pe.IsValid())
     {
+        std::cout << "The file provided is not a valid Portable Executable (PE)." << std::endl;
         return false;
     }
 

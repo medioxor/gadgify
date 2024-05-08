@@ -5,10 +5,10 @@
 
 int main(int argc, char *argv[]) {
     argparse::ArgumentParser program("Gadgify");
-    uint32_t gap = 0;
+    uint32_t gap = 3;
     program.add_argument("-g", "--gap")
-            .help("The gap between instructions specified in the pattern e.g. searching for the pattern"
-                  "'mov r*, r1*;call r*;sub *' with a gap of '3' will result in gadgets that can have up to 3"
+            .help("The gap between instructions specified in the pattern e.g. searching for the "
+                  "'mov r*, r1*;call r*;sub *' pattern with a gap of '3' will result in gadgets that can have up to 3 "
                   "instructions that do not match the pattern between each instruction in the pattern provided.")
             .scan<'u', uint32_t>()
             .default_value(gap);
@@ -62,7 +62,14 @@ int main(int argc, char *argv[]) {
         );
     }
 
-    std::cout << results.str() << std::endl;
+    if (results.str().empty())
+    {
+        std::cout << "No gadgets found that matched your query." << std::endl;
+    }
+    else
+    {
+        std::cout << results.str() << std::endl;
+    }
 
     return 0;
 }

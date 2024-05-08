@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <iostream>
 #include <regex>
 #include <Zydis/Zydis.h>
 #include "PEFile.h"
