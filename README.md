@@ -3,7 +3,9 @@
 Gadgify is a fast and simplified gadget enumeration tool for x86_64
 binaries with flexible functionality to make filtering for specific gadgets
 a breeze. Gadgify can be used to find ROP, JOP, COP, and COOP gadgets by querying
-for sequences of instructions using a simplified regex based search.
+for sequences of instructions using a simplified regex based search. Prebuilt binaries
+for Windows and Linux can be found via the following URL:
+- https://github.com/medioxor/gadgify/releases
 
 ## Features
 - Supports x86-64 Portable Executables (PE)
