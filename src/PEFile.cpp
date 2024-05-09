@@ -2,11 +2,8 @@
 
 PEFile::PEFile(std::string filePath)
 {
-    FileContents file = File::Read(std::move(filePath));
-    peContents_ = std::vector<char>(file.size);
-    memcpy(peContents_.data(), file.contents, file.size);
-    free(file.contents);
-    peSize_ = file.size;
+    peContents_ = File::Read(std::move(filePath));
+    peSize_ = peContents_.size();
     peBufferAddr_ = reinterpret_cast<uintptr_t>(peContents_.data());
     ParseHeadersAndValidate();
 }

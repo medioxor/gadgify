@@ -62,7 +62,6 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
         csh handle;
         cs_insn *insn;
         size_t count;
-
         if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
         {
             return false;
@@ -141,6 +140,10 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
                 matches = 0;
                 gadget.clear();
             }
+            if (gadget.size() == 1)
+            {
+                firstOffset = insn[j].address;
+            }
             if (regexes.size() == matches)
             {
                 std::string gadgetString;
@@ -149,7 +152,7 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
                     gadgetString.append(i);
                     gadgetString.append("; ");
                 }
-                callback(insn[j].address + bytecode.virtualAddress, gadgetString);
+                callback(firstOffset + bytecode.virtualAddress, gadgetString);
                 gapCounter = 0;
                 matches = 0;
                 gadget.clear();

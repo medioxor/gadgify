@@ -40,12 +40,12 @@ int main(int argc, char *argv[]) {
 
     if (isRaw)
     {
-        FileContents file = File::Read(program.get<std::string>("binaryPath"));
+        std::vector<char> fileContents(File::Read(program.get<std::string>("binaryPath")));
         Gadgify::GetGadgets([&results](uint64_t offset, const std::string &gadget)
             {
                 results << "0x" << std::hex << std::setfill('0') << std::setw(8) << offset << ": " << gadget << std::endl;
             },
-            std::vector<char>(file.contents, file.contents+file.size),
+            fileContents,
             program.get<std::string>("--pattern"),
             program.get<uint32_t>("--gap")
         );

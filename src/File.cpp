@@ -55,22 +55,15 @@ size_t File::GetSize(std::string filePath) {
     return file.GetSize();
 }
 
-FileContents File::Read(std::string filePath) {
+std::vector<char> File::Read(std::string filePath) {
     File file(std::move(filePath));
     return file.Read();
 }
 
-FileContents File::Read() {
-    size_t fileSize = GetSize();
-    FileContents file = {
-            .size = fileSize,
-            .contents = reinterpret_cast<char*>(calloc(fileSize, 1))
-    };
-    fileStream_.read(file.contents, file.size);
-    if (!file.contents)
-    {
-        file.size = 0;
-    }
+std::vector<char> File::Read() {
+    std::vector<char> fileContents(GetSize());
 
-    return file;
+    fileStream_.read(fileContents.data(), static_cast<long long>(fileContents.size()));
+
+    return fileContents;
 }

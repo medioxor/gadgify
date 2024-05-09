@@ -5,19 +5,13 @@
 #ifndef GADGIFY_FILE_H
 #define GADGIFY_FILE_H
 
-struct FileContents
-{
-    size_t size;
-    char* contents;
-};
-
 class File {
 public:
     explicit File(std::string filePath);
     explicit File(std::string filePath, std::ios_base::openmode openMode);
     virtual ~File();
-    static FileContents Read(std::string filePath);
-    FileContents Read();
+    static std::vector<char> Read(std::string filePath);
+    std::vector<char> Read();
     static bool Delete(std::string filePath);
     static size_t GetSize(std::string filePath);
     bool Delete();
