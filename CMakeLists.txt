@@ -3,14 +3,14 @@ set(CMAKE_CXX_STANDARD 20)
 
 project(gadgify)
 
-option(ZYDIS_BUILD_TOOLS "" OFF)
-option(ZYDIS_BUILD_EXAMPLES "" OFF)
-add_subdirectory(deps/zydis)
+option(CAPSTONE_ARM_SUPPORT "" ON)
+option(CAPSTONE_AARCH64_SUPPORT "" ON)
+option(CAPSTONE_X86_SUPPORT "" ON)
+add_subdirectory(deps/capstone)
 add_subdirectory(deps/argparse)
 
 include_directories(
-        deps/phnt
-        deps/zydis/include
+        deps/capstone/include
         deps/argparse/include/argparse
 )
 
@@ -28,4 +28,4 @@ install(TARGETS gadgify)
 
 target_link_options(gadgify PRIVATE --static)
 
-target_link_libraries(gadgify PRIVATE "Zydis")
+target_link_libraries(gadgify PRIVATE "capstone")

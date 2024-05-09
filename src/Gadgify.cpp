@@ -58,64 +58,80 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
         std::vector<std::string> gadget;
         uint32_t gapCounter = 0;
         uint32_t matches = 0;
-        ZyanU64 runtime_address = 0;
-        ZyanUSize offset = 0;
-        ZydisDisassembledInstruction instruction;
-        while (ZYAN_SUCCESS(ZydisDisassembleIntel(
-                ZYDIS_MACHINE_MODE_LONG_64,
-                runtime_address,
-                reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(bytecode.bytes.data()) + offset),
-                bytecode.bytes.size() - offset,
-                &instruction
-        )))
+
+        csh handle;
+        cs_insn *insn;
+        size_t count;
+
+        if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
         {
+            return false;
+        }
+        count = cs_disasm(handle, reinterpret_cast<const uint8_t *>(bytecode.bytes.data()), bytecode.bytes.size(), 0x0, 0, &insn);
+        if (count == 0)
+        {
+            std::cout << "Failed to disassemble binary" << std::endl;
+            return false;
+        }
+        size_t j;
+        std::string instruction;
+        for (j = 0; j < count; j++) {
+            if (insn[j].op_str[0] == '\0')
+            {
+                instruction = std::string(insn[j].mnemonic);
+            }
+            else
+            {
+                instruction = std::string(insn[j].mnemonic) + " " + insn[j].op_str;
+            }
             if (matches > regexes.size())
             {
+                cs_free(insn, count);
+                cs_close(&handle);
                 return false;
             }
-            bool isMatch = std::regex_match(instruction.text, regexes[matches]);
+            bool isMatch = std::regex_match(instruction, regexes[matches]);
             if (isMatch)
             {
                 matches++;
-                gadget.emplace_back(instruction.text);
+                gadget.emplace_back(instruction);
             }
             else if (gapCounter < gapSize)
             {
-                if (instruction.info.mnemonic == ZYDIS_MNEMONIC_CALL ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_RET ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_SYSCALL ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JB ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JBE ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JCXZ ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JECXZ ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JKNZD ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JKZD ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JL ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JLE ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JMP ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNB ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNBE ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNL ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNLE ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNO ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNP ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNS ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JNZ ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JO ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JP ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JRCXZ ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JS ||
-                    instruction.info.mnemonic == ZYDIS_MNEMONIC_JZ
+                if (strcmp(insn[j].mnemonic, "call") == 0 ||
+                        strcmp(insn[j].mnemonic, "ret") == 0 ||
+                        strcmp(insn[j].mnemonic, "syscall") == 0 ||
+                        strcmp(insn[j].mnemonic, "jb") == 0 ||
+                        strcmp(insn[j].mnemonic, "jbe") == 0 ||
+                        strcmp(insn[j].mnemonic, "jcxz") == 0 ||
+                        strcmp(insn[j].mnemonic, "jecxz") == 0 ||
+                        strcmp(insn[j].mnemonic, "jknzd") == 0 ||
+                        strcmp(insn[j].mnemonic, "jkzd") == 0 ||
+                        strcmp(insn[j].mnemonic, "jl") == 0 ||
+                        strcmp(insn[j].mnemonic, "jle") == 0 ||
+                        strcmp(insn[j].mnemonic, "jmp") == 0 ||
+                        strcmp(insn[j].mnemonic, "jnb") == 0 ||
+                        strcmp(insn[j].mnemonic, "jnbe") == 0 ||
+                        strcmp(insn[j].mnemonic, "jnl") == 0 ||
+                        strcmp(insn[j].mnemonic, "jnle") == 0 ||
+                        strcmp(insn[j].mnemonic, "jno") == 0 ||
+                        strcmp(insn[j].mnemonic, "jnp") == 0 ||
+                        strcmp(insn[j].mnemonic, "jns") == 0 ||
+                        strcmp(insn[j].mnemonic, "jnz") == 0 ||
+                        strcmp(insn[j].mnemonic, "jo") == 0 ||
+                        strcmp(insn[j].mnemonic, "jp") == 0 ||
+                        strcmp(insn[j].mnemonic, "jrcxz") == 0 ||
+                        strcmp(insn[j].mnemonic, "js") == 0 ||
+                        strcmp(insn[j].mnemonic, "jz") == 0
                 )
                 {
                     gapCounter = 0;
                     matches = 0;
                     gadget.clear();
-                    firstOffset = 0;
                 }
                 else
                 {
-                    gadget.emplace_back(instruction.text);
+                    gadget.emplace_back(instruction);
                     gapCounter++;
                 }
             }
@@ -124,11 +140,6 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
                 gapCounter = 0;
                 matches = 0;
                 gadget.clear();
-                firstOffset = 0;
-            }
-            if (gadget.size() == 1)
-            {
-                firstOffset = offset;
             }
             if (regexes.size() == matches)
             {
@@ -138,17 +149,15 @@ bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
                     gadgetString.append(i);
                     gadgetString.append("; ");
                 }
-                callback(firstOffset + bytecode.virtualAddress, gadgetString);
+                callback(insn[j].address + bytecode.virtualAddress, gadgetString);
                 gapCounter = 0;
                 matches = 0;
                 gadget.clear();
-                firstOffset = 0;
             }
-            offset += instruction.info.length;
-            runtime_address += instruction.info.length;
         }
+        cs_free(insn, count);
+        cs_close(&handle);
     }
-
     return true;
 }
 

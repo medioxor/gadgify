@@ -8,7 +8,7 @@
 #include <map>
 #include <iostream>
 #include <regex>
-#include <Zydis/Zydis.h>
+#include <capstone/capstone.h>
 #include "PEFile.h"
 
 struct Bytecode
