@@ -28,4 +28,6 @@ install(TARGETS gadgify)
 
 target_link_options(gadgify PRIVATE --static)
 
-target_link_libraries(gadgify PRIVATE "capstone")
+target_compile_options(capstone PRIVATE -w)
+
+target_link_libraries(gadgify PRIVATE capstone)
