@@ -2,6 +2,7 @@
 #include <argparse.hpp>
 #include <iomanip>
 #include "Gadgify.h"
+#include "ExecutableBinary.h"
 
 int main(int argc, char *argv[]) {
     argparse::ArgumentParser program("Gadgify");
@@ -47,7 +48,8 @@ int main(int argc, char *argv[]) {
             },
             fileContents,
             program.get<std::string>("--pattern"),
-            program.get<uint32_t>("--gap")
+            program.get<uint32_t>("--gap"),
+            BINARYTYPE::RAW
         );
     }
     else
@@ -58,7 +60,8 @@ int main(int argc, char *argv[]) {
             },
             program.get<std::string>("binaryPath"),
             program.get<std::string>("--pattern"),
-            program.get<uint32_t>("--gap")
+            program.get<uint32_t>("--gap"),
+            BINARYTYPE::PE
         );
     }
 

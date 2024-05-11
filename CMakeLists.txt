@@ -22,6 +22,8 @@ add_executable(gadgify
         src/PEFile.h
         src/Gadgify.cpp
         src/Gadgify.h
+        src/ExecutableBinary.cpp
+        src/ExecutableBinary.h
 )
 
 install(TARGETS gadgify)

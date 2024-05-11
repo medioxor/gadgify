@@ -1,73 +1,62 @@
 #include "PEFile.h"
 
-PEFile::PEFile(std::string filePath)
-{
-    peContents_ = File::Read(std::move(filePath));
-    peSize_ = peContents_.size();
-    peBufferAddr_ = reinterpret_cast<uintptr_t>(peContents_.data());
-    ParseHeadersAndValidate();
-}
+#include <utility>
 
-PEFile::PEFile(std::vector<char> peContents) :
-    peContents_(std::move(peContents)),
-    peSize_(peContents.size()),
-    peBufferAddr_(reinterpret_cast<uintptr_t>(peContents_.data()))
+bool PEFile::ParseHeaders()
 {
-    ParseHeadersAndValidate();
-}
-
-PEFile::PEFile(char *peContentsBuffer, size_t bufferSize) :
-    peSize_(bufferSize)
-{
-    char* peContentsBufferEnd = reinterpret_cast<char*>(
-            reinterpret_cast<std::uintptr_t>(peContentsBuffer) + bufferSize);
-    peContents_ = std::vector(peContentsBuffer, peContentsBufferEnd);
-    peBufferAddr_ = reinterpret_cast<uintptr_t>(peContents_.data());
-    ParseHeadersAndValidate();
-}
-
-PEFile PEFile::Parse(std::string path)
-{
-    return PEFile(std::move(path));
-}
-
-size_t PEFile::GetSize()
-{
-    return peContents_.size();
-}
-
-void PEFile::ParseHeadersAndValidate()
-{
-    if (peContents_.size() < sizeof(IMAGE_DOS_HEADER))
+    if (binaryContents_.size() < sizeof(IMAGE_DOS_HEADER))
     {
         isValid_ = false;
-        return;
+        return false;
     }
 
-    dosHeader_ = reinterpret_cast<IMAGE_DOS_HEADER*>(peContents_.data());
+    dosHeader_ = reinterpret_cast<IMAGE_DOS_HEADER*>(binaryContents_.data());
     if (dosHeader_->e_magic != IMAGE_DOS_SIGNATURE)
     {
         isValid_ = false;
-        return;
+        return false;
     }
 
     uint32_t ntHeadersRva = dosHeader_->e_lfanew;
-    ntHeaders_ = reinterpret_cast<IMAGE_NT_HEADERS64*>(peBufferAddr_ + ntHeadersRva);
+    ntHeaders_ = reinterpret_cast<IMAGE_NT_HEADERS64*>(binaryBufferAddr_ + ntHeadersRva);
     if (!ValidatePtr(reinterpret_cast<uintptr_t>(ntHeaders_), sizeof(IMAGE_NT_HEADERS64)))
     {
         isValid_ = false;
-        return;
+        return false;
     }
-    if (ntHeaders_->FileHeader.Machine != IMAGE_FILE_MACHINE_IA64 && ntHeaders_->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64)
+
+    switch (ntHeaders_->FileHeader.Machine)
     {
-        isValid_ = false;
-        return;
+        case IMAGE_FILE_MACHINE_AMD64:
+        case IMAGE_FILE_MACHINE_IA64:
+            arch_ = CS_ARCH_X86;
+            mode_ = CS_MODE_64;
+            break;
+        case IMAGE_FILE_MACHINE_I386:
+            arch_ = CS_ARCH_X86;
+            mode_ = CS_MODE_32;
+            break;
+        case IMAGE_FILE_MACHINE_ARM:
+            arch_ = CS_ARCH_ARM;
+            mode_ = CS_MODE_ARM;
+            break;
+        case IMAGE_FILE_MACHINE_ARMNT:
+            arch_ = CS_ARCH_ARM;
+            mode_ = static_cast<cs_mode>(CS_MODE_LITTLE_ENDIAN + CS_MODE_ARM + CS_MODE_THUMB);
+            break;
+        case IMAGE_FILE_MACHINE_ARM64:
+            arch_ = CS_ARCH_AARCH64;
+            mode_ = CS_MODE_ARM;
+            break;
+        default:
+            isValid_ = false;
+            return false;
     }
 
     if (ntHeaders_->Signature != IMAGE_NT_SIGNATURE)
     {
         isValid_ = false;
-        return;
+        return false;
     }
 
     firstSection_ = reinterpret_cast<IMAGE_SECTION_HEADER*>(reinterpret_cast<uintptr_t>(ntHeaders_) +
@@ -78,98 +67,42 @@ void PEFile::ParseHeadersAndValidate()
     {
         firstSection_ = nullptr;
         isValid_ = false;
-        return;
+        return false;
     }
 
     numberOfSections_ = ntHeaders_->FileHeader.NumberOfSections;
 
     isValid_ = true;
-}
-
-bool PEFile::ValidatePtr(uintptr_t address, size_t typeSize) const
-{
-    if ((address + typeSize) > (peBufferAddr_ + peSize_) || address < peBufferAddr_)
-    {
-        return false;
-    }
     return true;
 }
 
-bool PEFile::IsValid() const
+bool PEFile::ParseSections()
 {
-    return isValid_;
-}
-
-bool PEFile::GetSections(const std::function<void(IMAGE_SECTION_HEADER sectionHeader, std::vector<char> sectionContents)> &callback, std::string filePath)
-{
-    PEFile pe(std::move(filePath));
-
-    if (!pe.IsValid())
+    if (numberOfSections_ == 0)
     {
-        std::cout << "The file provided is not a valid Portable Executable (PE)." << std::endl;
         return false;
     }
-
-    for (int i = 0; i < pe.GetNumberOfSections(); i++)
-    {
-        IMAGE_SECTION_HEADER sectionHeader = pe.GetSectionHeader(i);
-        std::vector<char> sectionContents = pe.GetSectionContents(i);
-        if (!sectionContents.empty())
-        {
-            callback(sectionHeader, sectionContents);
-        }
-    }
-
-    return true;
-}
-
-IMAGE_SECTION_HEADER PEFile::GetSectionHeader(int index)
-{
-    if (index < numberOfSections_)
-    {
-        return firstSection_[index];
-    }
-    else
-    {
-        return {0};
-    }
-}
-
-IMAGE_SECTION_HEADER PEFile::GetSectionHeader(const std::string& sectionName)
-{
     for (int i = 0; i < numberOfSections_; i++)
     {
-        IMAGE_SECTION_HEADER section = firstSection_[i];
-        std::string currentSectionName(reinterpret_cast<const char *const>(section.Name));
-        if (currentSectionName == sectionName)
+        IMAGE_SECTION_HEADER sectionHeader = firstSection_[i];
+        std::vector<char> sectionContents = GetSectionContents(i);
+        bool isExecutable = sectionHeader.Characteristics & IMAGE_SCN_CNT_CODE;
+        if (!sectionContents.empty())
         {
-            return section;
+            sections_.emplace_back(sectionContents, isExecutable, sectionHeader.VirtualAddress);
         }
     }
-
-    return {0};
-}
-
-size_t PEFile::GetNumberOfSections() const
-{
-    return numberOfSections_;
+    return true;
 }
 
 std::vector<char> PEFile::GetSectionContents(int index)
 {
-    IMAGE_SECTION_HEADER sectionHeader = GetSectionHeader(index);
-    std::string sectionName(reinterpret_cast<const char *const>(sectionHeader.Name));
-    return GetSectionContents(sectionName);
-}
-
-std::vector<char> PEFile::GetSectionContents(const std::string &sectionName)
-{
-    IMAGE_SECTION_HEADER sectionHeader = GetSectionHeader(sectionName);
+    IMAGE_SECTION_HEADER sectionHeader = firstSection_[index];
     if (sectionHeader.SizeOfRawData < 1)
     {
         return {};
     }
-    char* sectionContents = reinterpret_cast<char*>(peBufferAddr_ + sectionHeader.PointerToRawData);
+    char* sectionContents = reinterpret_cast<char*>(binaryBufferAddr_ + sectionHeader.PointerToRawData);
     if (!ValidatePtr(reinterpret_cast<std::uintptr_t>(sectionContents), sectionHeader.SizeOfRawData))
     {
         return {};
@@ -178,4 +111,47 @@ std::vector<char> PEFile::GetSectionContents(const std::string &sectionName)
             reinterpret_cast<std::uintptr_t>(sectionContents) + sectionHeader.SizeOfRawData);
 
     return {sectionContents, sectionContentsEnd};
+}
+
+std::optional<PEFile> PEFile::Create(std::string filePath) {
+    PEFile pe(std::move(filePath));
+    if (pe.Parse())
+    {
+        return pe;
+    }
+    return std::nullopt;
+}
+
+std::optional<PEFile> PEFile::Create(std::vector<char> binaryContents) {
+    PEFile pe(std::move(binaryContents));
+    if (pe.Parse())
+    {
+        return pe;
+    }
+    return std::nullopt;
+}
+
+std::optional<PEFile> PEFile::Create(char *binaryContentsBuffer, size_t bufferSize) {
+    PEFile pe(binaryContentsBuffer, bufferSize);
+    if (pe.Parse())
+    {
+        return pe;
+    }
+    return std::nullopt;
+}
+
+bool PEFile::Parse() {
+    if (!ParseHeaders())
+    {
+        return false;
+    }
+    if (!ParseSections())
+    {
+        return false;
+    }
+    if (!Disassemble(arch_, mode_))
+    {
+        return false;
+    }
+    return true;
 }

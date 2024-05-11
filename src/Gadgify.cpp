@@ -1,165 +1,114 @@
 #include "Gadgify.h"
 
-Gadgify::Gadgify(std::string peFile) {
-    PEFile::GetSections([&](IMAGE_SECTION_HEADER sectionHeader, const std::vector<char>& sectionContents)
-    {
-        if (sectionHeader.Characteristics & IMAGE_SCN_CNT_CODE)
-        {
-            bytecodes_.push_back(
-                    {
-                        .virtualAddress = sectionHeader.VirtualAddress,
-                        .bytes = sectionContents
-                    }
-            );
-        }
-    }, std::move(peFile));
-}
+#include <utility>
 
-Gadgify::Gadgify(std::vector<char> bytes) {
-    bytecodes_.push_back(
+Gadgify::Gadgify(std::vector<char> binaryContents, BINARYTYPE type) {
+    switch (type)
+    {
+        case PE:
+            std::optional<PEFile> pe = PEFile::Create(std::move(binaryContents));
+            if (pe.has_value())
             {
-                    .virtualAddress = 0,
-                    .bytes = std::move(bytes)
+                controlFlowMnemonics_ = pe->GetControlFlowMnemonics();
+                for (const Section& section : pe->GetSections())
+                {
+                    if (section.isExecutable_)
+                    {
+                        sections_.push_back(section);
+                    }
+                }
             }
-    );
+            break;
+    }
 }
 
 void
 Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::string &gadget)> &callback, std::string peFile,
-                    const std::string &pattern, uint32_t gapSize) {
-    Gadgify gadgify(std::move(peFile));
-
-    gadgify.SearchGadgets([&](uint64_t offset, const std::string &gadget) {
-        callback(offset, gadget);
-    }, pattern, gapSize);
+                    const std::string &pattern, uint32_t gapSize, BINARYTYPE type) {
+    std::optional<Gadgify> gadgify = Gadgify::Create(std::move(peFile), type);
+    if (gadgify.has_value())
+    {
+        gadgify->SearchGadgets([&](uint64_t offset, const std::string &gadget) {
+            callback(offset, gadget);
+        }, pattern, gapSize);
+    }
 }
 
 void Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::string &gadget)> &callback,
                          std::vector<char> bytes,
-                         const std::string &pattern, uint32_t gapSize) {
-    Gadgify gadgify(std::move(bytes));
-
-    gadgify.SearchGadgets([&](uint64_t offset, const std::string &gadget) {
-        callback(offset, gadget);
-    }, pattern, gapSize);
+                         const std::string &pattern, uint32_t gapSize, BINARYTYPE type) {
+    std::optional<Gadgify> gadgify = Gadgify::Create(std::move(bytes), type);
+    if (gadgify.has_value())
+    {
+        gadgify->SearchGadgets([&](uint64_t offset, const std::string &gadget) {
+            callback(offset, gadget);
+        }, pattern, gapSize);
+    }
 }
 
 bool Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &callback, const std::string &pattern,
                             uint32_t gapSize) {
     std::vector<std::regex> regexes = ConstructRegexes(pattern);
-    if (regexes.empty())
-    {
+    if (regexes.empty()) {
         return false;
     }
-
-    for (Bytecode bytecode : bytecodes_)
-    {
-        uint64_t firstOffset = 0;
-        std::vector<std::string> gadget;
-        uint32_t gapCounter = 0;
-        uint32_t matches = 0;
-
-        csh handle;
-        cs_insn *insn;
-        size_t count;
-        if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+    for (const Section &section: sections_) {
+        for (const std::vector<Instruction>& chunk: section.instructionChunks_)
         {
-            return false;
-        }
-        count = cs_disasm(handle, reinterpret_cast<const uint8_t *>(bytecode.bytes.data()), bytecode.bytes.size(), 0x0, 0, &insn);
-        if (count == 0)
-        {
-            std::cout << "Failed to disassemble binary" << std::endl;
-            return false;
-        }
-        size_t j;
-        std::string instruction;
-        for (j = 0; j < count; j++) {
-            if (insn[j].op_str[0] == '\0')
+            uint64_t firstOffset = 0;
+            std::vector<std::string> gadget;
+            uint32_t gapCounter = 0;
+            uint32_t matches = 0;
+            for (const Instruction& instruction : chunk)
             {
-                instruction = std::string(insn[j].mnemonic);
-            }
-            else
-            {
-                instruction = std::string(insn[j].mnemonic) + " " + insn[j].op_str;
-            }
-            if (matches > regexes.size())
-            {
-                cs_free(insn, count);
-                cs_close(&handle);
-                return false;
-            }
-            bool isMatch = std::regex_match(instruction, regexes[matches]);
-            if (isMatch)
-            {
-                matches++;
-                gadget.emplace_back(instruction);
-            }
-            else if (gapCounter < gapSize)
-            {
-                if (strcmp(insn[j].mnemonic, "call") == 0 ||
-                        strcmp(insn[j].mnemonic, "ret") == 0 ||
-                        strcmp(insn[j].mnemonic, "syscall") == 0 ||
-                        strcmp(insn[j].mnemonic, "jb") == 0 ||
-                        strcmp(insn[j].mnemonic, "jbe") == 0 ||
-                        strcmp(insn[j].mnemonic, "jcxz") == 0 ||
-                        strcmp(insn[j].mnemonic, "jecxz") == 0 ||
-                        strcmp(insn[j].mnemonic, "jknzd") == 0 ||
-                        strcmp(insn[j].mnemonic, "jkzd") == 0 ||
-                        strcmp(insn[j].mnemonic, "jl") == 0 ||
-                        strcmp(insn[j].mnemonic, "jle") == 0 ||
-                        strcmp(insn[j].mnemonic, "jmp") == 0 ||
-                        strcmp(insn[j].mnemonic, "jnb") == 0 ||
-                        strcmp(insn[j].mnemonic, "jnbe") == 0 ||
-                        strcmp(insn[j].mnemonic, "jnl") == 0 ||
-                        strcmp(insn[j].mnemonic, "jnle") == 0 ||
-                        strcmp(insn[j].mnemonic, "jno") == 0 ||
-                        strcmp(insn[j].mnemonic, "jnp") == 0 ||
-                        strcmp(insn[j].mnemonic, "jns") == 0 ||
-                        strcmp(insn[j].mnemonic, "jnz") == 0 ||
-                        strcmp(insn[j].mnemonic, "jo") == 0 ||
-                        strcmp(insn[j].mnemonic, "jp") == 0 ||
-                        strcmp(insn[j].mnemonic, "jrcxz") == 0 ||
-                        strcmp(insn[j].mnemonic, "js") == 0 ||
-                        strcmp(insn[j].mnemonic, "jz") == 0
-                )
+                if (matches > regexes.size())
+                {
+                    return false;
+                }
+                bool isMatch = std::regex_match(instruction.instruction_, regexes[matches]);
+                if (isMatch) {
+                    matches++;
+                    gadget.emplace_back(instruction.instruction_);
+                }
+                else if (gapCounter < gapSize)
+                {
+                    if (std::find(controlFlowMnemonics_.begin(), controlFlowMnemonics_.end(), instruction.mnemonic_) != controlFlowMnemonics_.end())
+                    {
+                        gapCounter = 0;
+                        matches = 0;
+                        gadget.clear();
+                    }
+                    else
+                    {
+                        gadget.emplace_back(instruction.instruction_);
+                        gapCounter++;
+                    }
+                }
+                else
                 {
                     gapCounter = 0;
                     matches = 0;
                     gadget.clear();
                 }
-                else
+                if (gadget.size() == 1)
                 {
-                    gadget.emplace_back(instruction);
-                    gapCounter++;
+                    firstOffset = instruction.offset_;
                 }
-            }
-            else
-            {
-                gapCounter = 0;
-                matches = 0;
-                gadget.clear();
-            }
-            if (gadget.size() == 1)
-            {
-                firstOffset = insn[j].address;
-            }
-            if (regexes.size() == matches)
-            {
-                std::string gadgetString;
-                for (const std::string& i : gadget)
+                if (regexes.size() == matches)
                 {
-                    gadgetString.append(i);
-                    gadgetString.append("; ");
+                    std::string gadgetString;
+                    for (const std::string &i: gadget)
+                    {
+                        gadgetString.append(i);
+                        gadgetString.append("; ");
+                    }
+                    callback(firstOffset + section.virtualAddress_, gadgetString);
+                    gapCounter = 0;
+                    matches = 0;
+                    gadget.clear();
                 }
-                callback(firstOffset + bytecode.virtualAddress, gadgetString);
-                gapCounter = 0;
-                matches = 0;
-                gadget.clear();
             }
         }
-        cs_free(insn, count);
-        cs_close(&handle);
     }
     return true;
 }
@@ -202,4 +151,20 @@ std::vector<std::regex> Gadgify::ConstructRegexes(const std::string& pattern) {
         regexes.clear();
     }
     return regexes;
+}
+
+std::optional<Gadgify> Gadgify::Create(std::string filePath, BINARYTYPE type) {
+    return Gadgify::Create(File::Read(std::move(filePath)), type);
+}
+
+std::optional<Gadgify> Gadgify::Create(std::vector<char> binaryContents, BINARYTYPE type) {
+    Gadgify gadgify(std::move(binaryContents), type);
+    if (gadgify.sections_.empty())
+    {
+        return std::nullopt;
+    }
+    else
+    {
+        return gadgify;
+    }
 }
