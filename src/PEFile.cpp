@@ -42,7 +42,7 @@ bool PEFile::ParseHeaders()
             break;
         case IMAGE_FILE_MACHINE_ARMNT:
             arch_ = CS_ARCH_ARM;
-            mode_ = static_cast<cs_mode>(CS_MODE_LITTLE_ENDIAN + CS_MODE_ARM + CS_MODE_THUMB);
+            mode_ = CS_MODE_THUMB;
             break;
         case IMAGE_FILE_MACHINE_ARM64:
             arch_ = CS_ARCH_AARCH64;
@@ -146,10 +146,6 @@ bool PEFile::Parse() {
         return false;
     }
     if (!ParseSections())
-    {
-        return false;
-    }
-    if (!Disassemble(arch_, mode_))
     {
         return false;
     }

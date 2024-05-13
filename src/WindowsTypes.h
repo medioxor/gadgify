@@ -12,6 +12,7 @@
 #define IMAGE_FILE_MACHINE_I386         0x14c
 #define IMAGE_FILE_MACHINE_ARM          0x1c0
 #define IMAGE_FILE_MACHINE_ARMNT        0x1c4
+#define IMAGE_SCN_MEM_EXECUTE           0x20000000
 #define IMAGE_FILE_MACHINE_ARM64        0xaa64
 #define IMAGE_SIZEOF_SHORT_NAME 		8
 #define IMAGE_DOS_SIGNATURE             0x5A4D
