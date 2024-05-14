@@ -12,7 +12,7 @@
 class ThreadPool {
 public:
     explicit ThreadPool(uint32_t threads = std::thread::hardware_concurrency());
-    void Enqueue(const std::function<void(void)>& task);
+    void Enqueue(const std::function<void()>& task);
     void Wait();
     virtual ~ThreadPool();
 private:

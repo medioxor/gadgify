@@ -54,7 +54,7 @@ void Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::st
 }
 
 bool Gadgify::Disassemble(const std::function<void(std::vector<Instruction>, uint64_t)> &callback, cs_arch arch, cs_mode mode) {
-    ThreadPool pool(4);
+    ThreadPool pool;
     switch (arch)
     {
         case CS_ARCH_X86:
@@ -105,8 +105,9 @@ bool Gadgify::Disassemble(const std::function<void(std::vector<Instruction>, uin
     {
         return false;
     }
-    cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+    //cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
     cs_insn *insn = cs_malloc(handle);
+    uint32_t returnCounter = 0;
     for (Section& section : sections_)
     {
         if (section.isExecutable_)
@@ -125,14 +126,25 @@ bool Gadgify::Disassemble(const std::function<void(std::vector<Instruction>, uin
                                 insn->op_str,
                                 insn->address
                     );
+                    totalDisassembled += insn->size;
                     if (strcmp(insn->mnemonic, returnMnemonic_.data()) == 0)
                     {
-                        pool.Enqueue([instructionChunk, section, callback]() {
-                            callback(instructionChunk, section.virtualAddress_);
+                        returnCounter++;
+                    }
+                    if (returnCounter == 40)
+                    {
+                        pool.Enqueue([chunk = std::move(instructionChunk), virtualAddress = section.virtualAddress_, callback]() {
+                            callback(chunk, virtualAddress);
                         });
-                        instructionChunk.clear();
+                        returnCounter = 0;
                     }
                     totalDisassembled += insn->size;
+                }
+                if (!instructionChunk.empty())
+                {
+                    pool.Enqueue([chunk = std::move(instructionChunk), virtualAddress = section.virtualAddress_, callback]() {
+                        callback(chunk, virtualAddress);
+                    });
                 }
                 totalDisassembled += 1;
             }

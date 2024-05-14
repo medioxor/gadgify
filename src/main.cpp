@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 
     bool isRaw = program.get<bool>("--raw");
     std::stringstream results;
-
+    std::mutex stringStreamMutex;
     if (isRaw)
     {
         std::vector<char> fileContents(File::Read(program.get<std::string>("binaryPath")));
@@ -54,8 +54,9 @@ int main(int argc, char *argv[]) {
     }
     else
     {
-        Gadgify::GetGadgets([&results](uint64_t offset, const std::string &gadget)
+        Gadgify::GetGadgets([&results, &stringStreamMutex](uint64_t offset, const std::string &gadget)
             {
+                std::lock_guard<std::mutex> streamLock(stringStreamMutex);
                 results << "0x" << std::hex << std::setfill('0') << std::setw(8) << offset << ": " << gadget << std::endl;
             },
             program.get<std::string>("binaryPath"),
