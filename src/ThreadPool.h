@@ -17,7 +17,6 @@ public:
     virtual ~ThreadPool();
 private:
     void Thread();
-
     std::vector<std::thread> threads_;
     std::deque<std::function<void()>> taskQueue_;
     std::mutex taskQueueMutex_;
