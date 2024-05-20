@@ -83,6 +83,22 @@ aadtb.dll+0x000013ec: add rsp, 0x48; ret;
 aadtb.dll+0x0000149c: mov rsi, qword ptr [rsp + 0x60]; add rsp, 0x40; pop rdi; ret;
 *SNIP*
 ```
+- Search for ROP gadgets in a dumped section of executable code:
+```
+gadgify.exe -p "ret;" raw -a x64 -e little ..\..\ntdll.dll_text.bin
+*SNIP*
+0x001172ec: add rsp, 0x80; pop rbx; ret;
+0x001174c8: mov rdi, qword ptr [rsp + 0x48]; add rsp, 0x20; pop r14; ret;
+0x0011773d: pop rdi; pop rsi; pop rbp; ret;
+0x00117df4: pop rdi; pop rsi; pop rbp; ret;
+0x00117f61: mov rsi, qword ptr [rsp + 0x48]; add rsp, 0x20; pop rdi; ret;
+0x001180fa: pop r13; pop r12; pop rdi; ret;
+0x001181a1: mov rdi, qword ptr [rsp + 0x48]; add rsp, 0x20; pop r14; ret;
+0x00118207: xor eax, eax; ret;
+0x0011820b: mov eax, 1; ret;
+*SNIP*
+```
+**Note:** This could be any buffer of raw executable code such as JIT regions.
 
 ## Credits
 I took some inspiration and ideas from the following projects:

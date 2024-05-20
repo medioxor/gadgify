@@ -82,8 +82,35 @@ std::optional<Gadgify> Gadgify::Create(
         std::cout << "Unknown endianness: " << endianness << std::endl;
         return std::nullopt;
     }
+    if (isThumb)
+    {
+        mode = static_cast<cs_mode>(mode + CS_MODE_THUMB);
+    }
     cs_arch architecture{};
 
+    if (arch == "x64")
+    {
+        architecture = CS_ARCH_X86;
+        mode = static_cast<cs_mode>(mode + CS_MODE_64);
+    }
+    if (arch == "x86")
+    {
+        architecture = CS_ARCH_X86;
+        mode = static_cast<cs_mode>(mode + CS_MODE_32);
+    }
+    if (arch == "arm32")
+    {
+        architecture = CS_ARCH_ARM;
+        if (!isThumb)
+        {
+            mode = static_cast<cs_mode>(mode + CS_MODE_ARM);
+        }
+    }
+    if (arch == "arm64")
+    {
+        architecture = CS_ARCH_AARCH64;
+        mode = static_cast<cs_mode>(mode + CS_MODE_ARM);
+    }
 
     Gadgify gadgify(binaryContents, architecture, mode);
     if (gadgify.sections_.empty())
