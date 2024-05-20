@@ -75,45 +75,48 @@ bool PEFile::ParseHeaders()
     IMAGE_DATA_DIRECTORY* debugDataDirectory = &ntHeaders_->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
     if (ValidatePtr(reinterpret_cast<uintptr_t>(debugDataDirectory), sizeof(IMAGE_DATA_DIRECTORY)))
     {
-        for (int i = 0; i < numberOfSections_; i++)
+        IMAGE_SECTION_HEADER* sectionHeader = firstSection_;
+        int currentSection = 0;
+        while (ValidatePtr(reinterpret_cast<uintptr_t>(sectionHeader), sizeof(IMAGE_SECTION_HEADER )) && currentSection < numberOfSections_)
         {
-            IMAGE_SECTION_HEADER sectionHeader = firstSection_[i];
-            if ((debugDataDirectory->VirtualAddress >= sectionHeader.VirtualAddress) && (debugDataDirectory->VirtualAddress < (sectionHeader.VirtualAddress + sectionHeader.Misc.VirtualSize)))
+            if ((debugDataDirectory->VirtualAddress >= sectionHeader->VirtualAddress) && (debugDataDirectory->VirtualAddress < (sectionHeader->VirtualAddress + sectionHeader->Misc.VirtualSize)))
             {
-                uintptr_t sectionData = binaryBufferAddr_ + sectionHeader.PointerToRawData;
-                DWORD relativeOffset = (debugDataDirectory->VirtualAddress - sectionHeader.VirtualAddress);
+                uintptr_t sectionData = binaryBufferAddr_ + sectionHeader->PointerToRawData;
+                DWORD relativeOffset = (debugDataDirectory->VirtualAddress - sectionHeader->VirtualAddress);
                 size_t debugDirectoryCount = debugDataDirectory->Size / sizeof(IMAGE_DEBUG_DIRECTORY);
+                int currentEntry = 0;
                 auto debugDirectory = reinterpret_cast<PIMAGE_DEBUG_DIRECTORY>(sectionData + relativeOffset);
-                if (ValidatePtr(reinterpret_cast<uintptr_t>(debugDirectory), sizeof(IMAGE_DEBUG_DIRECTORY)))
+                while (ValidatePtr(reinterpret_cast<uintptr_t>(debugDirectory), sizeof(IMAGE_DEBUG_DIRECTORY)) && currentEntry < debugDirectoryCount)
                 {
-                    for (int j = 0; j < debugDirectoryCount; j++)
+                    if (debugDirectory->Type == IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS)
                     {
-                        if (debugDirectory[j].Type == IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS)
+                        auto* characteristics = reinterpret_cast<uint32_t*>(binaryBufferAddr_ + debugDirectory->PointerToRawData);
+                        if (ValidatePtr(reinterpret_cast<uintptr_t>(characteristics), sizeof(uint32_t)))
                         {
-                            auto* characteristics = reinterpret_cast<uint32_t*>(binaryBufferAddr_ + debugDirectory[j].PointerToRawData);
-                            if (ValidatePtr(reinterpret_cast<uintptr_t>(characteristics), sizeof(uint32_t)))
+                            if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT)
                             {
-                                if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT)
-                                {
-                                    cetCompat_ = true;
-                                }
-                                if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT_STRICT_MODE)
-                                {
-                                    cetCompatStrict_ = true;
-                                }
-                                if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_SET_CONTEXT_IP_VALIDATION_RELAXED_MODE)
-                                {
-                                    cetIpValidation_ = true;
-                                }
-                                if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_DYNAMIC_APIS_ALLOW_IN_PROC)
-                                {
-                                    cetAllowDynamicApi_ = true;
-                                }
+                                cetCompat_ = true;
+                            }
+                            if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT_STRICT_MODE)
+                            {
+                                cetCompatStrict_ = true;
+                            }
+                            if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_SET_CONTEXT_IP_VALIDATION_RELAXED_MODE)
+                            {
+                                cetIpValidation_ = true;
+                            }
+                            if (*characteristics & IMAGE_DLLCHARACTERISTICS_EX_CET_DYNAMIC_APIS_ALLOW_IN_PROC)
+                            {
+                                cetAllowDynamicApi_ = true;
                             }
                         }
                     }
+                    currentEntry++;
+                    debugDirectory += sizeof(IMAGE_DEBUG_DIRECTORY);
                 }
             }
+            currentSection++;
+            sectionHeader += sizeof(IMAGE_SECTION_HEADER);
         }
     }
 
@@ -127,15 +130,18 @@ bool PEFile::ParseSections()
     {
         return false;
     }
-    for (int i = 0; i < numberOfSections_; i++)
+    IMAGE_SECTION_HEADER* sectionHeader = firstSection_;
+    int currentSection = 0;
+    while (ValidatePtr(reinterpret_cast<uintptr_t>(sectionHeader), sizeof(IMAGE_SECTION_HEADER )) && currentSection < numberOfSections_)
     {
-        IMAGE_SECTION_HEADER sectionHeader = firstSection_[i];
-        std::vector<char> sectionContents = GetSectionContents(i);
-        bool isExecutable = sectionHeader.Characteristics & IMAGE_SCN_CNT_CODE;
+        std::vector<char> sectionContents = GetSectionContents(currentSection);
+        bool isExecutable = sectionHeader->Characteristics & IMAGE_SCN_CNT_CODE;
         if (!sectionContents.empty())
         {
-            sections_.emplace_back(sectionContents, isExecutable, sectionHeader.VirtualAddress);
+            sections_.emplace_back(sectionContents, isExecutable, sectionHeader->VirtualAddress);
         }
+        currentSection++;
+        sectionHeader += sizeof(IMAGE_SECTION_HEADER);
     }
     return true;
 }

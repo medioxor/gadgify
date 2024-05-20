@@ -7,6 +7,7 @@ add_subdirectory(deps/argparse)
 include_directories(
         deps/capstone/include
         deps/argparse/include/argparse
+        src/
 )
 
 add_compile_definitions(CAPSTONE_USE_SYS_DYN_MEM CAPSTONE_HAS_X86, CAPSTONE_HAS_ARM, CAPSTONE_HAS_AARCH64, CAPSTONE_HAS_MIPS)
@@ -42,3 +43,24 @@ add_executable(gadgify
 install(TARGETS gadgify)
 target_link_libraries(gadgify PRIVATE capstone)
 target_link_options(gadgify PRIVATE --static)
+
+IF(DEFINED FUZZER)
+    add_executable(fuzzer
+        fuzzer/fuzzer.cpp
+        src/File.cpp
+        src/File.h
+        src/PEFile.cpp
+        src/PEFile.h
+        src/Gadgify.cpp
+        src/Gadgify.h
+        src/ExecutableBinary.cpp
+        src/ExecutableBinary.h
+        src/ThreadPool.cpp
+        src/ThreadPool.h
+    )
+
+    target_link_libraries(fuzzer PRIVATE capstone)
+    target_compile_options(fuzzer PRIVATE /DEBUG /fsanitize=address /fsanitize=fuzzer)
+    target_link_options(fuzzer PRIVATE /DEBUG /fsanitize=address /fsanitize=fuzzer)
+    install(TARGETS fuzzer)
+ENDIF(DEFINED FUZZER)

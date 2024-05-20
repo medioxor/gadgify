@@ -23,7 +23,7 @@ Gadgify::Gadgify(std::vector<char> binaryContents, bool allowCet)
         {
             if (!allowCet && pe->isCetCompat())
             {
-                std::cout << "Binary is compatible with Intel CET, not going to search for gadgets." << std::endl;
+                //std::cout << "Binary is compatible with Intel CET, not going to search for gadgets." << std::endl;
                 return;
             }
             arch_ = pe->GetArch();
@@ -39,7 +39,7 @@ Gadgify::Gadgify(std::vector<char> binaryContents, bool allowCet)
     }
     if (type == UNKNOWN)
     {
-        std::cout << "Binary is not a valid PE, ELF, or MACH-O" << std::endl;
+        //std::cout << "Binary is not a valid PE, ELF, or MACH-O" << std::endl;
     }
 }
 
@@ -401,7 +401,7 @@ BINARYTYPE Gadgify::DetermineBinaryType(const std::vector<char>& binaryContents)
             {BINARYTYPE::MACH, {0xFE, 0xED, 0xFA, 0xCF}},
             {BINARYTYPE::MACH, {0xCE, 0xFA, 0xED, 0xFE}}
     };
-    if (binaryContents.size() < 2)
+    if (binaryContents.size() < 4)
     {
         return UNKNOWN;
     }
