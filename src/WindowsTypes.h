@@ -17,15 +17,31 @@
 #define IMAGE_SIZEOF_SHORT_NAME 		8
 #define IMAGE_DOS_SIGNATURE             0x5A4D
 #define IMAGE_NT_SIGNATURE              0x00004550
-
+#define IMAGE_DIRECTORY_ENTRY_DEBUG     6
+#define IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS 20
+#define IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT 0x0001
+#define IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT_STRICT_MODE 0x0002
+#define IMAGE_DLLCHARACTERISTICS_EX_CET_SET_CONTEXT_IP_VALIDATION_RELAXED_MODE 0x0004
+#define IMAGE_DLLCHARACTERISTICS_EX_CET_DYNAMIC_APIS_ALLOW_IN_PROC 0x0008
 #define FIELD_OFFSET(type, field)    ((LONG)(LONG_PTR)&(((type *)0)->field))
 
 typedef intptr_t LONG_PTR;
 typedef uint32_t DWORD;
-typedef unsigned short WORD;
-typedef unsigned char BYTE;
+typedef uint16_t WORD;
+typedef uint8_t BYTE;
 typedef uint64_t ULONGLONG;
 typedef int32_t LONG;
+
+typedef struct _IMAGE_DEBUG_DIRECTORY {
+    DWORD Characteristics;
+    DWORD TimeDateStamp;
+    WORD  MajorVersion;
+    WORD  MinorVersion;
+    DWORD Type;
+    DWORD SizeOfData;
+    DWORD AddressOfRawData;
+    DWORD PointerToRawData;
+} IMAGE_DEBUG_DIRECTORY, *PIMAGE_DEBUG_DIRECTORY;
 
 typedef struct _IMAGE_SECTION_HEADER {
     BYTE  Name[IMAGE_SIZEOF_SHORT_NAME];

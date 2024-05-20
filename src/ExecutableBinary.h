@@ -12,7 +12,8 @@ enum BINARYTYPE
 {   PE = 0,
     ELF = 1,
     MACH = 2,
-    RAW = 3
+    RAW = 3,
+    UNKNOWN = 4
 };
 
 class Instruction {

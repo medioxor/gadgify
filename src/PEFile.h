@@ -18,11 +18,16 @@ public:
     static std::optional<PEFile> Create(std::string filePath);
     static std::optional<PEFile> Create(std::vector<char> binaryContents);
     static std::optional<PEFile> Create(char* binaryContentsBuffer, size_t bufferSize);
+    bool isCetCompat() const;
 private:
     [[nodiscard]] bool Parse();
     bool ParseHeaders();
     bool ParseSections();
     std::vector<char> GetSectionContents(int index);
+    bool cetCompat_{false};
+    bool cetCompatStrict_{false};
+    bool cetIpValidation_{false};
+    bool cetAllowDynamicApi_{false};
     IMAGE_DOS_HEADER* dosHeader_{};
     IMAGE_NT_HEADERS64* ntHeaders_{};
     IMAGE_SECTION_HEADER* firstSection_{};

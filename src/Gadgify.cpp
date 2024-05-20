@@ -2,46 +2,106 @@
 
 #include <utility>
 
-Gadgify::Gadgify(std::vector<char> binaryContents, BINARYTYPE type) {
-    switch (type)
+Gadgify::Gadgify(const std::vector<char> &binaryContents, cs_arch arch, cs_mode mode)
+{
+    arch_ = arch;
+    mode_ = mode;
+    sections_.emplace_back(
+        binaryContents,
+        true,
+        0
+    );
+}
+
+Gadgify::Gadgify(std::vector<char> binaryContents, bool allowCet)
+{
+    BINARYTYPE type = DetermineBinaryType(binaryContents);
+    if (type == BINARYTYPE::PE)
     {
-        case PE:
-            std::optional<PEFile> pe = PEFile::Create(std::move(binaryContents));
-            if (pe.has_value())
+        std::optional<PEFile> pe = PEFile::Create(std::move(binaryContents));
+        if (pe.has_value())
+        {
+            if (!allowCet && pe->isCetCompat())
             {
-                arch_ = pe->GetArch();
-                mode_ = pe->GetMode();
-                for (const Section& section : pe->GetSections())
+                std::cout << "Binary is compatible with Intel CET, not going to search for gadgets." << std::endl;
+                return;
+            }
+            arch_ = pe->GetArch();
+            mode_ = pe->GetMode();
+            for (const Section& section : pe->GetSections())
+            {
+                if (section.isExecutable_)
                 {
-                    if (section.isExecutable_)
-                    {
-                        sections_.push_back(section);
-                    }
+                    sections_.push_back(section);
                 }
             }
-            break;
+        }
+    }
+    if (type == UNKNOWN)
+    {
+        std::cout << "Binary is not a valid PE, ELF, or MACH-O" << std::endl;
     }
 }
 
-void
-Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::string &gadget)> &callback, std::string peFile,
-                    const std::string &pattern, uint32_t gapSize, BINARYTYPE type) {
-    std::optional<Gadgify> gadgify = Gadgify::Create(std::move(peFile), type);
-    if (gadgify.has_value())
+std::optional<Gadgify> Gadgify::Create(std::string filePath, bool allowCet)
+{
+    return Gadgify::Create(File::Read(std::move(filePath)), allowCet);
+}
+
+std::optional<Gadgify> Gadgify::Create(std::vector<char> binaryContents, bool allowCet)
+{
+    Gadgify gadgify(std::move(binaryContents), allowCet);
+    if (gadgify.sections_.empty())
     {
-        std::vector<std::regex> regexes = ConstructRegexes(pattern);
-        gadgify->Disassemble([&](const std::vector<Instruction>& instructions, uint64_t virtualAddress) {
-            gadgify->SearchGadgets([&](uint64_t offset, const std::string &gadget) {
-                callback(offset, gadget);
-            }, regexes, gapSize, instructions, virtualAddress);
-        }, gadgify->arch_, gadgify->mode_);
+        return std::nullopt;
+    }
+    else
+    {
+        return gadgify;
+    }
+}
+
+std::optional<Gadgify> Gadgify::Create(
+        const std::vector<char>& binaryContents,
+        std::string arch,
+        const std::string& endianness,
+        bool isThumb
+)
+{
+    auto mode = static_cast<cs_mode>(0);
+    if (endianness == "little")
+    {
+        mode = static_cast<cs_mode>(mode + CS_MODE_LITTLE_ENDIAN);
+    }
+    else if (endianness == "big")
+    {
+        mode = static_cast<cs_mode>(mode + CS_MODE_BIG_ENDIAN);
+    }
+    else
+    {
+        std::cout << "Unknown endianness: " << endianness << std::endl;
+        return std::nullopt;
+    }
+    cs_arch architecture{};
+
+
+    Gadgify gadgify(binaryContents, architecture, mode);
+    if (gadgify.sections_.empty())
+    {
+        return std::nullopt;
+    }
+    else
+    {
+        return gadgify;
     }
 }
 
 void Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::string &gadget)> &callback,
-                         std::vector<char> bytes,
-                         const std::string &pattern, uint32_t gapSize, BINARYTYPE type) {
-    std::optional<Gadgify> gadgify = Gadgify::Create(std::move(bytes), type);
+                         const std::vector<char>& bytes, const std::string &pattern, uint32_t gapSize,
+                         const std::string &arch, const std::string &endianness, bool isThumb)
+{
+    std::optional<Gadgify> gadgify = Gadgify::Create(bytes, arch, endianness, isThumb);
+
     std::vector<std::regex> regexes = ConstructRegexes(pattern);
     if (gadgify.has_value())
     {
@@ -53,7 +113,35 @@ void Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::st
     }
 }
 
-bool Gadgify::Disassemble(const std::function<void(std::vector<Instruction>, uint64_t)> &callback, cs_arch arch, cs_mode mode) {
+void Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::string &gadget)> &callback,
+                         std::string filePath,
+                         const std::string &pattern, uint32_t gapSize, bool allowCet)
+{
+    GetGadgets(callback, File::Read(std::move(filePath)), pattern, gapSize, allowCet);
+}
+
+void Gadgify::GetGadgets(const std::function<void(uint64_t offset, const std::string &gadget)> &callback,
+                         std::vector<char> bytes,
+                         const std::string &pattern, uint32_t gapSize, bool allowCet)
+{
+    std::optional<Gadgify> gadgify = Gadgify::Create(std::move(bytes), allowCet);
+    std::vector<std::regex> regexes = ConstructRegexes(pattern);
+    if (gadgify.has_value())
+    {
+        gadgify->Disassemble([&](const std::vector<Instruction>& instructions, uint64_t virtualAddress) {
+            gadgify->SearchGadgets([&](uint64_t offset, const std::string &gadget) {
+                callback(offset, gadget);
+            }, regexes, gapSize, instructions, virtualAddress);
+        }, gadgify->arch_, gadgify->mode_);
+    }
+}
+
+bool Gadgify::Disassemble(
+        const std::function<void(std::vector<Instruction>, uint64_t)> &callback,
+        cs_arch arch,
+        cs_mode mode
+)
+{
     ThreadPool pool;
     switch (arch)
     {
@@ -105,7 +193,7 @@ bool Gadgify::Disassemble(const std::function<void(std::vector<Instruction>, uin
     {
         return false;
     }
-    //cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+    cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
     cs_insn *insn = cs_malloc(handle);
     uint32_t returnCounter = 0;
     for (Section& section : sections_)
@@ -156,9 +244,16 @@ bool Gadgify::Disassemble(const std::function<void(std::vector<Instruction>, uin
     return true;
 }
 
-void Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &callback, std::vector<std::regex> regexes,
-                            uint32_t gapSize, const std::vector<Instruction> &instructions, uint64_t virtualAddress) {
-    if (regexes.empty()) {
+void Gadgify::SearchGadgets(
+        const std::function<void(uint64_t, std::string)> &callback,
+        std::vector<std::regex> regexes,
+        uint32_t gapSize,
+        const std::vector<Instruction> &instructions,
+        uint64_t virtualAddress
+)
+{
+    if (regexes.empty())
+    {
         return;
     }
     uint64_t firstOffset = 0;
@@ -175,7 +270,8 @@ void Gadgify::SearchGadgets(const std::function<void(uint64_t, std::string)> &ca
             continue;
         }
         bool isMatch = std::regex_match(instruction.instruction_, regexes[matches]);
-        if (isMatch) {
+        if (isMatch)
+        {
             matches++;
             if (!gap.empty())
             {
@@ -270,18 +366,24 @@ std::vector<std::regex> Gadgify::ConstructRegexes(const std::string& pattern) {
     return regexes;
 }
 
-std::optional<Gadgify> Gadgify::Create(std::string filePath, BINARYTYPE type) {
-    return Gadgify::Create(File::Read(std::move(filePath)), type);
-}
-
-std::optional<Gadgify> Gadgify::Create(std::vector<char> binaryContents, BINARYTYPE type) {
-    Gadgify gadgify(std::move(binaryContents), type);
-    if (gadgify.sections_.empty())
+BINARYTYPE Gadgify::DetermineBinaryType(const std::vector<char>& binaryContents) {
+    std::vector<std::tuple<BINARYTYPE, std::vector<uint8_t>>> types = {
+            {BINARYTYPE::PE, {0x4D, 0x5A}},
+            {BINARYTYPE::ELF, {0x7F, 0x45, 0x4C, 0x46}},
+            {BINARYTYPE::MACH, {0xFE, 0xED, 0xFA, 0xCE}},
+            {BINARYTYPE::MACH, {0xFE, 0xED, 0xFA, 0xCF}},
+            {BINARYTYPE::MACH, {0xCE, 0xFA, 0xED, 0xFE}}
+    };
+    if (binaryContents.size() < 2)
     {
-        return std::nullopt;
+        return UNKNOWN;
     }
-    else
+    for (const auto& [ binaryType, magicBytes ] : types)
     {
-        return gadgify;
+        if (memcmp(binaryContents.data(), magicBytes.data(), magicBytes.size()) == 0)
+        {
+            return binaryType;
+        }
     }
+    return UNKNOWN;
 }

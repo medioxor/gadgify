@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
 set(CMAKE_CXX_STANDARD 20)
-
 project(gadgify)
 
 add_subdirectory(deps/argparse)
@@ -14,12 +13,12 @@ add_compile_definitions(CAPSTONE_USE_SYS_DYN_MEM CAPSTONE_HAS_X86, CAPSTONE_HAS_
 file(GLOB
         capstoneSource
         deps/capstone/*.h
-        deps/capstone/arch/x86/*.h
+        deps/capstone/arch/X86/*.h
         deps/capstone/arch/ARM/*.h
         deps/capstone/arch/AArch64/*.h
         deps/capstone/arch/Mips/*.h
         deps/capstone/*.c
-        deps/capstone/arch/x86/*.c
+        deps/capstone/arch/X86/*.c
         deps/capstone/arch/ARM/*.c
         deps/capstone/arch/AArch64/*.c
         deps/capstone/arch/Mips/*.c
